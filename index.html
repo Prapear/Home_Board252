@@ -792,59 +792,55 @@ const Admin=({shop,setShop,sched,setSched,wakeups,setWakeups,notes,setNotes})=>{
 };
 
 // ── APP ROOT ──────────────────────────────────────────────────────────────────
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyGHsGvQ47IhLQow0IJ_QWMtBCwqP-ftO4-LJiS3snuf_nq14nPaRapAI6kbOyu0g/exec';
+
 const App=()=>{
   const [page,setPage]=useState('dashboard');
   const [user,setUser]=useState(()=>ls.get('hb_user','CHA'));
-const SHEET_URL='https://script.google.com/macros/s/AKfycbyGHsGvQ47IhLQow0IJ_QWMtBCwqP-ftO4-LJiS3snuf_nq14nPaRapAI6kbOyu0g/exec';
-const [sched,setSchedRaw]=useState({});
-const [shop,setShopRaw]=useState([]);
-const [wakeups,setWakeupsRaw]=useState([]);
-const [notes,setNotesRaw]=useState([]);
-const [loaded,setLoaded]=useState(false);
-const [pinModal,setPinModal]=useState(null);
-const [pinInput,setPinInput]=useState('');
-const [pinErr,setPinErr]=useState(false);
-
-useEffect(()=>{
-  fetch(SHEET_URL)
-    .then(r=>r.json())
-    .then(d=>{
-      if(d.sched) setSchedRaw(d.sched);
-      if(d.shop)  setShopRaw(d.shop);
-      if(d.wakeups) setWakeupsRaw(d.wakeups);
-      if(d.notes) setNotesRaw(d.notes);
-    })
-    .catch(()=>{
-      setSchedRaw(ls.get('hb_sched',{}));
-      setShopRaw(ls.get('hb_shop',[]));
-      setWakeupsRaw(ls.get('hb_wake',[]));
-      setNotesRaw(ls.get('hb_notes',[]));
-    })
-    .finally(()=>setLoaded(true));
-},[]);
-
-const handleSwitchUser=(mid)=>{
-  if(mid===user)return;
-  setPinInput('');
-  setPinErr(false);
-  setPinModal(mid);
-};
-const confirmPin=()=>{
-  const m=gM(pinModal);
-  if(pinInput===m?.pin){setUser(pinModal);setPinModal(null);}
-  else{setPinErr(true);}
-};
+  const [sched,setSchedRaw]=useState(()=>ls.get('hb_sched',{}));
+  const [shop,setShopRaw]=useState(()=>ls.get('hb_shop',[]));
+  const [wakeups,setWakeupsRaw]=useState(()=>ls.get('hb_wake',[]));
+  const [notes,setNotesRaw]=useState(()=>ls.get('hb_notes',[]));
   const [toasts,setToasts]=useState([]);
+  const [pinModal,setPinModal]=useState(null);
+  const [pinInput,setPinInput]=useState('');
+  const [pinErr,setPinErr]=useState(false);
+
+  useEffect(()=>{
+    fetch(SHEET_URL)
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.sched) setSchedRaw(d.sched);
+        if(d.shop)  setShopRaw(d.shop);
+        if(d.wakeups) setWakeupsRaw(d.wakeups);
+        if(d.notes) setNotesRaw(d.notes);
+      })
+      .catch(()=>{});
+  },[]);
 
   useEffect(()=>ls.set('hb_user',user),[user]);
   useEffect(()=>ls.set('hb_sched',sched),[sched]);
   useEffect(()=>ls.set('hb_shop',shop),[shop]);
   useEffect(()=>ls.set('hb_wake',wakeups),[wakeups]);
   useEffect(()=>ls.set('hb_notes',notes),[notes]);
-const syncToSheet=useCallback(()=>{
-  fetch(SHEET_URL,{method:'POST',body:JSON.stringify({sched,shop,wakeups,notes}),headers:{'Content-Type':'text/plain'}}).catch(()=>{});
-},[sched,shop,wakeups,notes]);
-useEffect(()=>{const t=setTimeout(syncToSheet,3000);return()=>clearTimeout(t);},[syncToSheet]);
+
+  const syncToSheet=useCallback(()=>{
+    fetch(SHEET_URL,{method:'POST',body:JSON.stringify({sched,shop,wakeups,notes}),headers:{'Content-Type':'text/plain'}}).catch(()=>{});
+  },[sched,shop,wakeups,notes]);
+  useEffect(()=>{const t=setTimeout(syncToSheet,3000);return()=>clearTimeout(t);},[syncToSheet]);
+
+  const handleSwitchUser=(mid)=>{
+    if(mid===user)return;
+    setPinInput('');
+    setPinErr(false);
+    setPinModal(mid);
+  };
+  const confirmPin=()=>{
+    const m=gM(pinModal);
+    if(pinInput===m?.pin){setUser(pinModal);setPinModal(null);}
+    else{setPinErr(true);}
+  };
+
   const pushToast=useCallback((t)=>{
     setToasts(p=>[...p,t]);
     setTimeout(()=>setToasts(p=>p.filter(x=>x.id!==t.id)),6000);
