@@ -804,7 +804,11 @@ const App=()=>{
   useEffect(()=>ls.set('hb_shop',shop),[shop]);
   useEffect(()=>ls.set('hb_wake',wakeups),[wakeups]);
   useEffect(()=>ls.set('hb_notes',notes),[notes]);
-
+const SHEET_URL='https://script.google.com/macros/s/AKfycbz6QRQlBwU38SubcLrwRPJrrW9a9urpIkEHHofFfCn8Uy3T33Wy5OOTVoRh6PTWMiw/exec';
+const syncToSheet=useCallback(()=>{
+  fetch(SHEET_URL,{method:'POST',body:JSON.stringify({sched,shop,wakeups,notes}),headers:{'Content-Type':'text/plain'}}).catch(()=>{});
+},[sched,shop,wakeups,notes]);
+useEffect(()=>{const t=setTimeout(syncToSheet,3000);return()=>clearTimeout(t);},[syncToSheet]);
   const pushToast=useCallback((t)=>{
     setToasts(p=>[...p,t]);
     setTimeout(()=>setToasts(p=>p.filter(x=>x.id!==t.id)),6000);
