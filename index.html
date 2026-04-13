@@ -31,10 +31,10 @@ const {useState,useEffect,useCallback,useRef}=React;
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const M=[
-  {id:'CHA',     name:'CHA',      isAdmin:true,  color:'#92400E',bg:'#FEF3C7',acc:'#D97706'},
-  {id:'PINGPING',name:'PING PING',isNurse:true,  color:'#9D174D',bg:'#FCE7F3',acc:'#DB2777'},
-  {id:'OREO',    name:'OREO',                    color:'#4C1D95',bg:'#EDE9FE',acc:'#7C3AED'},
-  {id:'MOM',     name:'MOM',                     color:'#065F46',bg:'#D1FAE5',acc:'#059669'},
+  {id:'CHA',     name:'CHA',      isAdmin:true,  pin:'0405', color:'#92400E',bg:'#FEF3C7',acc:'#D97706'},
+  {id:'PINGPING',name:'PING PING',isNurse:true,  pin:'1012', color:'#9D174D',bg:'#FCE7F3',acc:'#DB2777'},
+  {id:'OREO',    name:'OREO',                    pin:'0104', color:'#4C1D95',bg:'#EDE9FE',acc:'#7C3AED'},
+  {id:'MOM',     name:'MOM',                     pin:'0611', color:'#065F46',bg:'#D1FAE5',acc:'#059669'},
 ];
 const NS=[
   {id:'morning',  lb:'เช้า',    t:'06-14',em:'🌅',c:'#D97706',bg:'#FEF3C7',tc:'#92400E'},
@@ -795,10 +795,44 @@ const Admin=({shop,setShop,sched,setSched,wakeups,setWakeups,notes,setNotes})=>{
 const App=()=>{
   const [page,setPage]=useState('dashboard');
   const [user,setUser]=useState(()=>ls.get('hb_user','CHA'));
-  const [sched,setSchedRaw]=useState(()=>ls.get('hb_sched',{}));
-  const [shop,setShopRaw]=useState(()=>ls.get('hb_shop',[]));
-  const [wakeups,setWakeupsRaw]=useState(()=>ls.get('hb_wake',[]));
-  const [notes,setNotesRaw]=useState(()=>ls.get('hb_notes',[]));
+const [sched,setSchedRaw]=useState({});
+const [shop,setShopRaw]=useState([]);
+const [wakeups,setWakeupsRaw]=useState([]);
+const [notes,setNotesRaw]=useState([]);
+const [loaded,setLoaded]=useState(false);
+const [pinModal,setPinModal]=useState(null);
+const [pinInput,setPinInput]=useState('');
+const [pinErr,setPinErr]=useState(false);
+
+useEffect(()=>{
+  fetch(SHEET_URL)
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.sched) setSchedRaw(d.sched);
+      if(d.shop)  setShopRaw(d.shop);
+      if(d.wakeups) setWakeupsRaw(d.wakeups);
+      if(d.notes) setNotesRaw(d.notes);
+    })
+    .catch(()=>{
+      setSchedRaw(ls.get('hb_sched',{}));
+      setShopRaw(ls.get('hb_shop',[]));
+      setWakeupsRaw(ls.get('hb_wake',[]));
+      setNotesRaw(ls.get('hb_notes',[]));
+    })
+    .finally(()=>setLoaded(true));
+},[]);
+
+const handleSwitchUser=(mid)=>{
+  if(mid===user)return;
+  setPinInput('');
+  setPinErr(false);
+  setPinModal(mid);
+};
+const confirmPin=()=>{
+  const m=gM(pinModal);
+  if(pinInput===m?.pin){setUser(pinModal);setPinModal(null);}
+  else{setPinErr(true);}
+};
   const [toasts,setToasts]=useState([]);
 
   useEffect(()=>ls.set('hb_user',user),[user]);
@@ -806,7 +840,8 @@ const App=()=>{
   useEffect(()=>ls.set('hb_shop',shop),[shop]);
   useEffect(()=>ls.set('hb_wake',wakeups),[wakeups]);
   useEffect(()=>ls.set('hb_notes',notes),[notes]);
-const SHEET_URL='https://script.google.com/macros/s/AKfycbz6QRQlBwU38SubcLrwRPJrrW9a9urpIkEHHofFfCn8Uy3T33Wy5OOTVoRh6PTWMiw/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyGHsGvQ47IhLQow0IJ_QWMtBCwqP-ftO4-LJiS3snuf_nq14nPaRapAI6kbOyu0g/exec
+';
 const syncToSheet=useCallback(()=>{
   fetch(SHEET_URL,{method:'POST',body:JSON.stringify({sched,shop,wakeups,notes}),headers:{'Content-Type':'text/plain'}}).catch(()=>{});
 },[sched,shop,wakeups,notes]);
@@ -823,13 +858,35 @@ useEffect(()=>{const t=setTimeout(syncToSheet,3000);return()=>clearTimeout(t);},
 
   return(
     <div style={{fontFamily:"'Sarabun',sans-serif",background:'#FAF7F2',minHeight:'100vh'}}>
-      <ToastLayer toasts={toasts} dismiss={dismissToast}/>
+      <ToastLayer toasts={toasts} dismiss={dismissToast}/>{pinModal&&(
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{background:'rgba(0,0,0,.4)'}}>
+    <div className="wood rounded-2xl p-6 mx-4 w-full max-w-xs slide-up">
+      {(()=>{const m=gM(pinModal);return(<>
+        <div className="text-center mb-4">
+          <div className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg mx-auto mb-2" style={{background:m?.bg,color:m?.color}}>{m?.name.slice(0,2)}</div>
+          <p className="font-bold text-amber-900">ใส่ PIN ของ {m?.name}</p>
+        </div>
+        <input type="password" inputMode="numeric" maxLength={4} value={pinInput}
+          onChange={e=>{setPinInput(e.target.value);setPinErr(false);}}
+          onKeyDown={e=>e.key==='Enter'&&confirmPin()}
+          className="w-full text-center text-2xl tracking-widest rounded-xl px-3 py-3 border mb-3 outline-none"
+          style={{borderColor:pinErr?'#EF4444':'#E8DCC8',background:'#FAF7F2'}}
+          autoFocus placeholder="••••"/>
+        {pinErr&&<p className="text-red-400 text-xs text-center mb-3">PIN ไม่ถูกต้อง</p>}
+        <div className="flex gap-2">
+          <button onClick={()=>setPinModal(null)} className="flex-1 py-3 rounded-xl border border-amber-200 text-amber-500 font-semibold text-sm">ยกเลิก</button>
+          <button onClick={confirmPin} className="flex-1 py-3 rounded-xl text-white font-bold text-sm" style={{background:'#B45309'}}>เข้าสู่ระบบ</button>
+        </div>
+      </>);})()} 
+    </div>
+  </div>
+)}
       <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2 border-b border-amber-200" style={{background:'#FEFCF8'}}>
         <div className="flex items-center gap-2"><CatIcon sz={24}/><span className="text-sm font-black text-amber-800">Home Board</span></div>
         <div className="flex items-center gap-1">
           <span className="text-xs text-amber-400 mr-1">ฉัน:</span>
           {M.map(m=>(
-            <button key={m.id} onClick={()=>setUser(m.id)} className="text-xs px-2 py-1 rounded-full font-bold"
+            <button key={m.id} onClick={()=>handleSwitchUser(m.id)} className="text-xs px-2 py-1 rounded-full font-bold"
                     style={{background:user===m.id?m.acc:'#F3F4F6',color:user===m.id?'#fff':'#9CA3AF'}}>
               {m.name.split(' ')[0]}
             </button>
