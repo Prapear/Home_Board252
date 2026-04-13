@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>🐱 Home Board</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;font-family:'Sarabun',sans-serif;background:#FAF7F2;overscroll-behavior:none;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:#D4C5A9;border-radius:4px;}
+.slide-up{animation:su .3s cubic-bezier(.2,.8,.2,1);}
+.toast-in{animation:ti .4s cubic-bezier(.2,.8,.2,1);}
+.toast-out{animation:to .3s ease-in forwards;}
+@keyframes su{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes ti{from{transform:translateY(-60px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes to{from{opacity:1}to{transform:translateY(-40px);opacity:0}}
+.wood{background:linear-gradient(145deg,#FEFCF8,#FAF6EE);border:1px solid #E8DCC8;box-shadow:0 2px 14px rgba(139,90,43,.08);}
+button:active{transform:scale(.96);transition:transform .1s;}
+input,textarea{font-family:'Sarabun',sans-serif;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef}=React;
+
+// ── CONSTANTS ────────────────────────────────────────────────────────────────
+const M=[
+  {id:'CHA',     name:'CHA',      isAdmin:true,  color:'#92400E',bg:'#FEF3C7',acc:'#D97706'},
+  {id:'PINGPING',name:'PING PING',isNurse:true,  color:'#9D174D',bg:'#FCE7F3',acc:'#DB2777'},
+  {id:'OREO',    name:'OREO',                    color:'#4C1D95',bg:'#EDE9FE',acc:'#7C3AED'},
+  {id:'MOM',     name:'MOM',                     color:'#065F46',bg:'#D1FAE5',acc:'#059669'},
+];
+const NS=[
+  {id:'morning',  lb:'เช้า',    t:'06-14',em:'🌅',c:'#D97706',bg:'#FEF3C7',tc:'#92400E'},
+  {id:'afternoon',lb:'บ่าย',    t:'14-22',em:'☀️',c:'#EA580C',bg:'#FFEDD5',tc:'#9A3412'},
+  {id:'night',    lb:'ดึก',     t:'22-06',em:'🌙',c:'#4338CA',bg:'#E0E7FF',tc:'#3730A3'},
+  {id:'24hr',     lb:'24ชม.',   t:'24h',  em:'⏰',c:'#DC2626',bg:'#FEE2E2',tc:'#991B1B'},
+  {id:'off',      lb:'หยุด',    t:'',     em:'🌿',c:'#059669',bg:'#D1FAE5',tc:'#065F46'},
+  {id:'trip',    lb:'ไปเที่ยวต่างจังหวัด',em:'🗺️',c:'#0369A1',bg:'#E0F2FE',tc:'#0C4A6E'},
+  {id:'concert', lb:'ไปคอนเสิร์ต',       em:'🎵',c:'#7C3AED',bg:'#EDE9FE',tc:'#4C1D95'},
+  {id:'company', lb:'กิจกรรมบริษัท',     em:'🎪',c:'#B45309',bg:'#FEF3C7',tc:'#78350F'},
+];
+const HS=[
+  {id:'home',    lb:'อยู่บ้าน',          em:'🏠',c:'#059669',bg:'#D1FAE5',tc:'#065F46'},
+  {id:'work',    lb:'ไปทำงาน',           em:'💼',c:'#4B5563',bg:'#F3F4F6',tc:'#1F2937'},
+  {id:'trip',    lb:'ไปเที่ยวต่างจังหวัด',em:'🗺️',c:'#0369A1',bg:'#E0F2FE',tc:'#0C4A6E'},
+  {id:'concert', lb:'ไปคอนเสิร์ต',       em:'🎵',c:'#7C3AED',bg:'#EDE9FE',tc:'#4C1D95'},
+  {id:'company', lb:'กิจกรรมบริษัท',     em:'🎪',c:'#B45309',bg:'#FEF3C7',tc:'#78350F'},
+];
+const HOLS={
+  '2026-01-01':'วันขึ้นปีใหม่','2026-01-02':'ชดเชยวันขึ้นปีใหม่',
+  '2026-03-04':'วันมาฆบูชา',
+  '2026-04-06':'วันจักรี','2026-04-13':'วันสงกรานต์','2026-04-14':'วันสงกรานต์','2026-04-15':'วันสงกรานต์',
+  '2026-05-01':'วันแรงงานแห่งชาติ','2026-05-04':'วันฉัตรมงคล','2026-05-22':'วันวิสาขบูชา',
+  '2026-06-03':'วันเฉลิมพระชนมพรรษาพระราชินี',
+  '2026-07-20':'วันอาสาฬหบูชา','2026-07-21':'วันเข้าพรรษา','2026-07-28':'วันเฉลิมพระชนมพรรษา ร.10',
+  '2026-08-12':'วันแม่แห่งชาติ',
+  '2026-10-13':'วันนวมินทรมหาราช','2026-10-23':'วันปิยมหาราช',
+  '2026-12-05':'วันพ่อแห่งชาติ','2026-12-10':'วันรัฐธรรมนูญ','2026-12-31':'วันสิ้นปี',
+};
+const MTH=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const MTHF=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const DAYS=['อา','จ','อ','พ','พฤ','ศ','ส'];
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+const ls={
+  get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+};
+const tdStr=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const fmtD=s=>{const[y,m,d]=s.split('-').map(Number);return`${d} ${MTH[m-1]} ${y+543}`;};
+const gM=id=>M.find(m=>m.id===id);
+const gS=(mid,sid)=>{const m=gM(mid);return m?.isNurse?NS.find(s=>s.id===sid):HS.find(s=>s.id===sid);};
+
+// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
+const useNotifications=(wakeups,shop,pushToast)=>{
+  const timers=useRef({});
+  const notifPerm=useRef(typeof Notification!=='undefined'?Notification.permission:'denied');
+
+  const requestPerm=useCallback(async()=>{
+    if(typeof Notification==='undefined')return false;
+    const p=await Notification.requestPermission();
+    notifPerm.current=p;
+    return p==='granted';
+  },[]);
+
+  const fire=useCallback((title,body,tag)=>{
+    // in-app toast always
+    pushToast({title,body,id:tag+Date.now()});
+    // browser notif
+    if(notifPerm.current==='granted'){
+      try{new Notification(title,{body,tag,icon:''});}catch{}
+    }
+  },[pushToast]);
+
+  const scheduleWake=useCallback((call)=>{
+    const key=`wake_${call.id}`;
+    if(timers.current[key])return; // already scheduled
+    const now=new Date();
+    const[h,m]=call.time.split(':').map(Number);
+    const tgt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),h,m,0);
+    const delay=tgt-now;
+    if(delay<=0)return;
+    const tm=gM(call.target),bm=gM(call.by);
+    timers.current[key]=setTimeout(()=>{
+      fire(`⏰ ปลุก${tm?.name}! (${call.time})`,`${bm?.name} ฝากปลุกไว้`,key);
+      delete timers.current[key];
+    },delay);
+  },[fire]);
+
+  const scheduleShop=useCallback((items)=>{
+    const k='shop_17';
+    if(timers.current[k])clearTimeout(timers.current[k]);
+    const pending=items.filter(i=>!i.done);
+    if(!pending.length)return;
+    const now=new Date(),dow=now.getDay();
+    if(dow===0||dow===6)return;
+    const tgt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),17,0,0);
+    const delay=tgt-now;
+    if(delay<=0)return;
+    timers.current[k]=setTimeout(()=>{
+      fire('🛒 อย่าลืมซื้อของ!',`มีของรอซื้อ ${pending.length} รายการ ซื้อก่อนกลับบ้านเลย`,k);
+      delete timers.current[k];
+    },delay);
+  },[fire]);
+
+  // schedule on mount + when data changes
+  useEffect(()=>{
+    const td=tdStr();
+    wakeups.filter(c=>c.date===td).forEach(scheduleWake);
+  },[wakeups,scheduleWake]);
+
+  useEffect(()=>{ scheduleShop(shop); },[shop,scheduleShop]);
+
+  // cleanup
+  useEffect(()=>()=>{Object.values(timers.current).forEach(clearTimeout);},[]);
+
+  return{requestPerm,notifPerm};
+};
+
+// ── TOAST SYSTEM ──────────────────────────────────────────────────────────────
+const ToastLayer=({toasts,dismiss})=>(
+  <div className="fixed top-14 inset-x-0 z-50 flex flex-col gap-2 px-4 pointer-events-none">
+    {toasts.map(t=>(
+      <div key={t.id} className="toast-in rounded-2xl px-4 py-3 shadow-lg pointer-events-auto flex items-start gap-3"
+           style={{background:'#1C1917',maxWidth:'420px',margin:'0 auto',width:'100%'}}>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-amber-100 leading-tight">{t.title}</p>
+          <p className="text-xs text-amber-400 mt-0.5">{t.body}</p>
+        </div>
+        <button onClick={()=>dismiss(t.id)} className="text-amber-600 hover:text-amber-300 flex-shrink-0 mt-0.5">✕</button>
+      </div>
+    ))}
+  </div>
+);
+
+// ── CUTE CAT ICON (Maine Coon chibi) ─────────────────────────────────────────
+const CatIcon=({sz=28,active=false})=>{
+  const o=active?'#C2410C':'#F97316';
+  const i=active?'#EA580C':'#FB923C';
+  return(
+    <svg width={sz} height={sz} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      {/* หูซ้าย */}
+      <polygon points="18,50 8,10 40,36" fill={o}/>
+      <polygon points="20,48 13,18 37,36" fill="#FDBA74"/>
+      {/* หูขวา */}
+      <polygon points="82,50 92,10 60,36" fill={o}/>
+      <polygon points="80,48 87,18 63,36" fill="#FDBA74"/>
+      {/* หัวกลมๆ */}
+      <circle cx="50" cy="60" r="38" fill={o}/>
+      {/* แก้มฟู */}
+      <ellipse cx="20" cy="72" rx="14" ry="10" fill={i} opacity="0.55"/>
+      <ellipse cx="80" cy="72" rx="14" ry="10" fill={i} opacity="0.55"/>
+      {/* หน้าขาว/ครีม */}
+      <ellipse cx="50" cy="68" rx="26" ry="22" fill="#FEF3C7"/>
+      {/* ลายหน้าผาก Maine Coon */}
+      <path d="M37,30 Q50,24 63,30" stroke="#EA580C" strokeWidth="2.2" fill="none" strokeLinecap="round"/>
+      <path d="M40,37 Q50,32 60,37" stroke="#EA580C" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+      {/* ตา – ใหญ่มาก chibi */}
+      <ellipse cx="35" cy="60" rx="11" ry="12" fill="white"/>
+      <ellipse cx="65" cy="60" rx="11" ry="12" fill="white"/>
+      {/* ม่านตาสีเขียว */}
+      <ellipse cx="35" cy="60" rx="9" ry="11" fill="#6EE7B7"/>
+      <ellipse cx="65" cy="60" rx="9" ry="11" fill="#6EE7B7"/>
+      {/* รูม่านตา */}
+      <ellipse cx="35" cy="61" rx="4" ry="10" fill="#1C1917"/>
+      <ellipse cx="65" cy="61" rx="4" ry="10" fill="#1C1917"/>
+      {/* แสงตา */}
+      <circle cx="30" cy="54" r="3" fill="white"/>
+      <circle cx="38" cy="57" r="1.5" fill="white"/>
+      <circle cx="60" cy="54" r="3" fill="white"/>
+      <circle cx="68" cy="57" r="1.5" fill="white"/>
+      {/* จมูก */}
+      <polygon points="50,72 47,77 53,77" fill="#FB7185"/>
+      {/* ปาก */}
+      <path d="M47,77 Q44,82 40,80" stroke="#B45309" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+      <path d="M53,77 Q56,82 60,80" stroke="#B45309" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+      {/* หนวด */}
+      <line x1="2" y1="70" x2="37" y2="74" stroke="#92400E" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
+      <line x1="2" y1="77" x2="37" y2="76" stroke="#92400E" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
+      <line x1="63" y1="74" x2="98" y2="70" stroke="#92400E" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
+      <line x1="63" y1="76" x2="98" y2="77" stroke="#92400E" strokeWidth="1.4" strokeLinecap="round" opacity="0.6"/>
+      {/* จุดบนจมูก cute */}
+      <circle cx="50" cy="70" r="1.2" fill="#FB7185"/>
+    </svg>
+  );
+};
+
+// ── SVG ICONS ────────────────────────────────────────────────────────────────
+const Svg=({ch,sz=20,cl='',sw=2})=>(
+  <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" className={cl}>{ch}</svg>
+);
+const IC=p=><Svg {...p} ch={<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>}/>;
+const IN=p=><Svg {...p} ch={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>}/>;
+const ISt=p=><Svg {...p} ch={<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}/>;
+const IP=p=><Svg {...p} ch={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>}/>;
+const IX=p=><Svg {...p} ch={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>}/>;
+const ID=p=><Svg {...p} ch={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>}/>;
+const IL=p=><Svg {...p} ch={<polyline points="15 18 9 12 15 6"/>}/>;
+const IR=p=><Svg {...p} ch={<polyline points="9 18 15 12 9 6"/>}/>;
+const IK=p=><Svg {...p} sw={2.5} ch={<polyline points="20 6 9 17 4 12"/>}/>;
+const IBell=p=><Svg {...p} ch={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>}/>;
+
+// ── MODAL ────────────────────────────────────────────────────────────────────
+const Modal=({title,onClose,children})=>(
+  <div className="fixed inset-0 z-50 flex items-end" style={{background:'rgba(0,0,0,.45)',backdropFilter:'blur(3px)'}}>
+    <div className="w-full max-w-lg mx-auto wood rounded-t-3xl slide-up" style={{maxHeight:'88vh',overflowY:'auto'}}>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-amber-100 sticky top-0 wood rounded-t-3xl">
+        <h3 className="text-base font-bold text-amber-900">{title}</h3>
+        <button onClick={onClose} className="p-2 rounded-full text-amber-500 hover:bg-amber-100"><IX sz={18}/></button>
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  </div>
+);
+
+// ── BOTTOM NAV ───────────────────────────────────────────────────────────────
+const Nav=({page,go,admin})=>{
+  const tabs=[
+    {id:'dashboard',lb:'บ้าน',cat:true},
+    {id:'calendar', lb:'ปฏิทิน',I:IC},
+    {id:'notes',    lb:'โน้ต',I:IN},
+    ...(admin?[{id:'admin',lb:'Admin',I:ISt}]:[])
+  ];
+  return(
+    <nav className="fixed bottom-0 inset-x-0 z-40 border-t border-amber-200" style={{background:'#FEFCF8',paddingBottom:'env(safe-area-inset-bottom)'}}>
+      <div className="flex justify-around max-w-lg mx-auto">
+        {tabs.map(({id,lb,I,cat})=>{
+          const active=page===id;
+          return(
+            <button key={id} onClick={()=>go(id)} className="flex flex-col items-center py-2 px-3 flex-1 gap-0.5">
+              <span style={{color:active?'#B45309':'#C4B9AB'}}>
+                {cat?<CatIcon sz={26} active={active}/>:<I sz={22}/>}
+              </span>
+              <span className="text-xs" style={{color:active?'#B45309':'#C4B9AB',fontWeight:active?700:400}}>{lb}</span>
+              {active&&<div className="h-1 w-5 rounded-full" style={{background:'#B45309'}}/>}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+};
+
+// ── NOTIF BANNER ──────────────────────────────────────────────────────────────
+const NotifBanner=({requestPerm})=>{
+  const [state,setState]=useState(()=>typeof Notification!=='undefined'?Notification.permission:'unsupported');
+  if(state==='granted'||state==='unsupported')return null;
+  const ask=async()=>{const p=await requestPerm();if(p)setState('granted');};
+  return(
+    <div className="mx-4 mt-3 p-3 rounded-2xl flex items-center gap-3" style={{background:'#FEF3C7',border:'1px solid #FDE68A'}}>
+      <IBell sz={18} cl="text-amber-600 flex-shrink-0"/>
+      <p className="text-xs text-amber-800 flex-1">เปิด Notification เพื่อรับแจ้งเตือนปลุกและซื้อของ</p>
+      <button onClick={ask} className="text-xs font-bold text-white px-3 py-1.5 rounded-xl flex-shrink-0" style={{background:'#B45309'}}>เปิด</button>
+    </div>
+  );
+};
+
+// ── WHO'S HOME ────────────────────────────────────────────────────────────────
+const WhosHome=({sched,user,setUser})=>{
+  const td=tdStr(),day=sched[td]||{};
+  const isHome=mid=>{const s=day[mid];if(!s)return true;const m=gM(mid);return m?.isNurse?s==='off':s==='home';};
+  return(
+    <div className="wood rounded-2xl p-4 mb-4">
+      <div className="flex items-center mb-4 gap-2">
+        <CatIcon sz={26}/>
+        <h2 className="font-bold text-amber-900 text-base">Who's Home Now?</h2>
+        <span className="ml-auto text-xs text-amber-400">{fmtD(td)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {M.map(m=>{
+          const sid=day[m.id],sh=sid?gS(m.id,sid):null,home=isHome(m.id),me=user===m.id;
+          return(
+            <button key={m.id} onClick={()=>setUser(m.id)} className="rounded-2xl p-3 text-left relative"
+                    style={{background:me?m.bg:'#FEFCF8',border:`2px solid ${me?m.acc:'#E8DCC8'}`}}>
+              {me&&<span className="absolute top-2 right-2 text-white px-1.5 py-0.5 rounded-full font-bold" style={{background:m.acc,fontSize:'9px'}}>ฉัน</span>}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{background:m.bg,color:m.color,border:`2px solid ${m.acc}`}}>{m.name.slice(0,2)}</div>
+                <div>
+                  <p className="font-bold text-sm leading-tight" style={{color:m.color}}>{m.name}</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <div className="w-2 h-2 rounded-full" style={{background:home?'#10B981':'#D1D5DB'}}/>
+                    <span className="text-xs" style={{color:home?'#065F46':'#9CA3AF'}}>{home?'อยู่บ้าน':'ไม่อยู่'}</span>
+                  </div>
+                </div>
+              </div>
+              {sh?(
+                <div className="text-xs rounded-xl px-2 py-1.5 font-semibold leading-tight" style={{background:sh.bg,color:sh.tc}}>{sh.em} {sh.lb}</div>
+              ):(
+                <div className="text-xs rounded-xl px-2 py-1.5" style={{background:'#F3F4F6',color:'#9CA3AF'}}>ยังไม่ได้ลง</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-center text-xs text-amber-300 mt-3">แตะที่บัตรเพื่อเลือก "ฉัน"</p>
+    </div>
+  );
+};
+
+// ── WAKE-UP CALLS ─────────────────────────────────────────────────────────────
+const Wakeup=({calls,setCalls,user,onAdd})=>{
+  const [open,setOpen]=useState(false);
+  const [time,setTime]=useState('07:00');
+  const [target,setTarget]=useState('');
+  const [msg,setMsg]=useState('');
+  const td=tdStr(),today=calls.filter(c=>c.date===td);
+  const add=()=>{
+    if(!target)return;
+    const call={id:Date.now(),time,target,msg,by:user,date:td};
+    setCalls(p=>[...p,call]);
+    onAdd(call);
+    setOpen(false);setTarget('');setMsg('');setTime('07:00');
+  };
+  return(
+    <div className="wood rounded-2xl p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">⏰</span>
+        <h2 className="font-bold text-amber-900 text-base">Wake-up Call</h2>
+        <span className="text-xs px-2 py-0.5 rounded-full font-semibold text-amber-500" style={{background:'#FEF3C7'}}>{today.length}</span>
+        <button onClick={()=>setOpen(true)} className="ml-auto w-8 h-8 rounded-full flex items-center justify-center text-white" style={{background:'#B45309'}}><IP sz={15}/></button>
+      </div>
+      {today.length===0
+        ?<p className="text-sm text-amber-300 text-center py-2">ไม่มีการฝากปลุกวันนี้ 😴</p>
+        :<div className="space-y-2">
+          {today.map(c=>{
+            const tm=gM(c.target),bm=gM(c.by);
+            return(
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl" style={{background:'#FEF3C7',border:'1px solid #FDE68A'}}>
+                <div className="text-2xl font-black text-amber-700 min-w-[56px]">{c.time}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-900">ปลุก <span style={{color:tm?.color}}>{tm?.name}</span></p>
+                  {c.msg&&<p className="text-xs text-amber-600 mt-0.5 truncate">{c.msg}</p>}
+                  <p className="text-xs text-amber-400 mt-0.5">ฝากโดย {bm?.name}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs px-1.5 py-0.5 rounded-full font-bold" style={{background:'#D1FAE5',color:'#065F46',fontSize:'9px'}}>🔔 ตั้งไว้แล้ว</span>
+                  <button onClick={()=>setCalls(p=>p.filter(x=>x.id!==c.id))} className="text-amber-300 hover:text-red-400"><IX sz={14}/></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      }
+      {open&&(
+        <Modal title="ฝากปลุก ⏰" onClose={()=>setOpen(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-bold text-amber-800 block mb-2">เวลา</label>
+              <input type="time" value={time} onChange={e=>setTime(e.target.value)}
+                     className="w-full rounded-xl px-4 py-3 text-2xl border border-amber-200 outline-none font-bold"
+                     style={{background:'#FAF7F2',color:'#92400E'}}/>
+            </div>
+            <div>
+              <label className="text-sm font-bold text-amber-800 block mb-2">ปลุกใคร</label>
+              <div className="grid grid-cols-2 gap-2">
+                {M.filter(m=>m.id!==user).map(m=>(
+                  <button key={m.id} onClick={()=>setTarget(m.id)} className="py-3.5 rounded-xl text-sm font-bold"
+                          style={{background:target===m.id?m.bg:'#F9F5F0',color:target===m.id?m.color:'#9CA3AF',border:`2px solid ${target===m.id?m.acc:'transparent'}`}}>
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-bold text-amber-800 block mb-2">โน้ต (ถ้ามี)</label>
+              <input value={msg} onChange={e=>setMsg(e.target.value)} placeholder="ไปหมอ, ประชุม, นัดสำคัญ..."
+                     className="w-full rounded-xl px-4 py-3 text-sm border border-amber-200 outline-none"
+                     style={{background:'#FAF7F2',color:'#92400E'}}/>
+            </div>
+            <div className="rounded-xl p-3 text-xs text-amber-700" style={{background:'#FEF3C7'}}>
+              🔔 แอปจะแจ้งเตือนเมื่อถึงเวลา <span className="font-bold">(ต้องเปิดแอปค้างไว้)</span>
+            </div>
+            <button onClick={add} disabled={!target} className="w-full py-4 rounded-xl text-white font-bold text-base"
+                    style={{background:target?'#B45309':'#D4C5A9'}}>✓ ฝากปลุก</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ── SHOPPING LIST ─────────────────────────────────────────────────────────────
+const Shop=({items,setItems,user,isAdmin})=>{
+  const [txt,setTxt]=useState('');
+  const [show,setShow]=useState(false);
+  const add=()=>{if(!txt.trim())return;setItems(p=>[...p,{id:Date.now(),text:txt.trim(),done:false,by:user}]);setTxt('');setShow(false);};
+  const toggle=id=>setItems(p=>p.map(i=>i.id===id?{...i,done:!i.done}:i));
+  const del=id=>setItems(p=>p.filter(i=>i.id!==id));
+  const pending=items.filter(i=>!i.done),done=items.filter(i=>i.done);
+  const dow=new Date().getDay();
+  const shopDay=dow>=1&&dow<=5;
+  return(
+    <div className="wood rounded-2xl p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">🛒</span>
+        <h2 className="font-bold text-amber-900 text-base">Shopping List</h2>
+        <span className="text-xs font-semibold text-amber-500 px-2 py-0.5 rounded-full" style={{background:'#FEF3C7'}}>{pending.length}</span>
+        {pending.length>0&&shopDay&&(
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold" style={{background:'#D1FAE5',color:'#065F46',fontSize:'9px'}}>🔔 จะเตือน 17:00</span>
+        )}
+        {isAdmin&&done.length>0&&<button onClick={()=>setItems(p=>p.filter(i=>!i.done))} className="ml-auto text-xs text-red-400 underline">ล้างที่ซื้อแล้ว</button>}
+      </div>
+      <div className="space-y-2 mb-3">
+        {pending.map(it=>{const m=gM(it.by);return(
+          <div key={it.id} className="flex items-center gap-3 p-2.5 rounded-xl" style={{background:'#FAF7F2'}}>
+            <button onClick={()=>toggle(it.id)} className="w-6 h-6 rounded-full border-2 flex-shrink-0" style={{borderColor:'#D4C5A9'}}/>
+            <span className="flex-1 text-sm text-amber-900">{it.text}</span>
+            {m&&<span className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0" style={{background:m.bg,color:m.color}}>{m.name}</span>}
+            <button onClick={()=>del(it.id)} className="text-amber-300 hover:text-red-400"><IX sz={14}/></button>
+          </div>
+        );})}
+        {done.map(it=>(
+          <div key={it.id} className="flex items-center gap-3 p-2.5 rounded-xl opacity-40">
+            <button onClick={()=>toggle(it.id)} className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center" style={{background:'#10B981',border:'2px solid #10B981'}}><IK sz={11} cl="text-white"/></button>
+            <span className="flex-1 text-sm text-amber-700 line-through">{it.text}</span>
+          </div>
+        ))}
+        {items.length===0&&<p className="text-sm text-amber-300 text-center py-3">ยังไม่มีรายการ 🛍️</p>}
+      </div>
+      {show?(
+        <div className="flex gap-2">
+          <input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="เพิ่มรายการ..." autoFocus
+                 className="flex-1 rounded-xl px-3 py-2.5 text-sm border border-amber-200 outline-none" style={{background:'#FAF7F2',color:'#92400E'}}/>
+          <button onClick={add} className="rounded-xl px-4 py-2.5 text-sm font-bold text-white" style={{background:'#B45309'}}>เพิ่ม</button>
+          <button onClick={()=>{setShow(false);setTxt('');}} className="p-2 text-amber-400"><IX sz={18}/></button>
+        </div>
+      ):(
+        <button onClick={()=>setShow(true)} className="w-full py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold text-amber-600 border-2 border-dashed border-amber-200">
+          <IP sz={16}/> เพิ่มรายการ
+        </button>
+      )}
+    </div>
+  );
+};
+
+// ── QUICK NOTES ───────────────────────────────────────────────────────────────
+const QNotes=({notes,setNotes,user})=>{
+  const [txt,setTxt]=useState('');
+  const [show,setShow]=useState(false);
+  const add=()=>{if(!txt.trim())return;setNotes(p=>[...p,{id:Date.now(),text:txt.trim(),by:user,date:tdStr()}]);setTxt('');setShow(false);};
+  const pinned=[...notes].slice(-3).reverse();
+  return(
+    <div className="wood rounded-2xl p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xl">📌</span>
+        <h2 className="font-bold text-amber-900 text-base">Special Notes</h2>
+        <button onClick={()=>setShow(v=>!v)} className="ml-auto w-8 h-8 rounded-full flex items-center justify-center text-white" style={{background:'#B45309'}}><IP sz={15}/></button>
+      </div>
+      {show&&(
+        <div className="mb-3">
+          <textarea value={txt} onChange={e=>setTxt(e.target.value)} rows={2} autoFocus
+                    placeholder="กะดึก: อย่าส่งเสียงดัง · มีพัสดุ · อย่าล็อคประตู"
+                    className="w-full rounded-xl px-3 py-2.5 text-sm border border-amber-200 outline-none resize-none" style={{background:'#FAF7F2',color:'#92400E'}}/>
+          <div className="flex gap-2 mt-2">
+            <button onClick={add} className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold" style={{background:'#B45309'}}>บันทึก</button>
+            <button onClick={()=>setShow(false)} className="py-2.5 px-4 rounded-xl text-sm text-amber-600 border border-amber-200">ยกเลิก</button>
+          </div>
+        </div>
+      )}
+      <div className="space-y-2">
+        {pinned.length===0&&!show&&<p className="text-sm text-amber-300 text-center py-2">ไม่มีโน้ตพิเศษ 📝</p>}
+        {pinned.map(n=>{const m=gM(n.by);return(
+          <div key={n.id} className="rounded-xl p-3 relative" style={{background:'#FFFBEB',border:'1px solid #FEF08A'}}>
+            <button onClick={()=>setNotes(p=>p.filter(x=>x.id!==n.id))} className="absolute top-2 right-2 text-amber-300 hover:text-red-400"><IX sz={13}/></button>
+            <p className="text-sm text-amber-900 pr-5 leading-relaxed">{n.text}</p>
+            <div className="flex gap-1.5 items-center mt-1.5">
+              <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold" style={{background:m?.bg,color:m?.color}}>{m?.name}</span>
+              <span className="text-xs text-amber-400">{fmtD(n.date)}</span>
+            </div>
+          </div>
+        );})}
+      </div>
+    </div>
+  );
+};
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+const Dashboard=(p)=>(
+  <div className="px-4 pt-4 pb-28 max-w-lg mx-auto">
+    <div className="flex items-center gap-3 mb-4">
+      <CatIcon sz={40}/>
+      <div>
+        <h1 className="text-2xl font-black text-amber-900 leading-tight">Home Board</h1>
+        <p className="text-sm text-amber-500">สวัสดี {gM(p.user)?.name}! บ้านวันนี้เป็นยังไงบ้าง?</p>
+      </div>
+    </div>
+    <NotifBanner requestPerm={p.requestPerm}/>
+    <div className="mt-4">
+      <WhosHome sched={p.sched} user={p.user} setUser={p.setUser}/>
+      <Wakeup calls={p.wakeups} setCalls={p.setWakeups} user={p.user} onAdd={p.scheduleWake}/>
+      <Shop items={p.shop} setItems={p.setShop} user={p.user} isAdmin={p.isAdmin}/>
+      <QNotes notes={p.notes} setNotes={p.setNotes} user={p.user}/>
+    </div>
+  </div>
+);
+
+// ── MONTHLY SUMMARY ───────────────────────────────────────────────────────────
+const MonthSummary=({sched,yr,mo})=>{
+  const pfx=`${yr}-${String(mo+1).padStart(2,'0')}`;
+  const dim=new Date(yr,mo+1,0).getDate();
+  const holCount=Object.keys(HOLS).filter(k=>{const[hy,hm]=k.split('-').map(Number);return hy===yr&&hm===mo+1;}).length;
+  const weekends=[...Array(dim)].filter((_,i)=>{const d=new Date(yr,mo,i+1).getDay();return d===0||d===6;}).length;
+  const counts={};
+  M.forEach(m=>{counts[m.id]={};});
+  Object.entries(sched).filter(([k])=>k.startsWith(pfx)).forEach(([,day])=>{
+    Object.entries(day).forEach(([mid,sid])=>{if(counts[mid])counts[mid][sid]=(counts[mid][sid]||0)+1;});
+  });
+  const logged=Object.values(counts).some(c=>Object.keys(c).length>0);
+  return(
+    <div className="wood rounded-2xl p-4 mt-4">
+      <div className="flex items-center gap-2 mb-4"><span className="text-xl">📊</span><h3 className="font-bold text-amber-900">สรุปเดือน{MTHF[mo]}</h3></div>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {[{v:dim,lb:'วันทั้งหมด',em:'📅'},{v:holCount,lb:'วันหยุดนักขัตฤกษ์',em:'🎉'},{v:weekends,lb:'เสาร์-อาทิตย์',em:'🌿'}].map(s=>(
+          <div key={s.lb} className="rounded-xl p-2.5 text-center" style={{background:'#FEF3C7'}}>
+            <div className="text-lg">{s.em}</div>
+            <div className="text-2xl font-black text-amber-800">{s.v}</div>
+            <div className="text-amber-600 leading-tight mt-0.5" style={{fontSize:'9px'}}>{s.lb}</div>
+          </div>
+        ))}
+      </div>
+      {!logged?<p className="text-sm text-amber-300 text-center py-4">ยังไม่มีการลงเวรเดือนนี้ 🐱</p>:(
+        <div className="space-y-3">
+          {M.map(m=>{
+            const c=counts[m.id],shifts=m.isNurse?NS:HS,total=Object.values(c).reduce((a,b)=>a+b,0);
+            if(!total)return(
+              <div key={m.id} className="rounded-xl p-3 flex items-center gap-3" style={{background:'#F9F5F0'}}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs" style={{background:m.bg,color:m.color}}>{m.name.slice(0,2)}</div>
+                <span className="text-sm font-semibold" style={{color:m.color}}>{m.name}</span>
+                <span className="ml-auto text-xs text-amber-300">ยังไม่ได้ลง</span>
+              </div>
+            );
+            return(
+              <div key={m.id} className="rounded-xl p-3" style={{background:m.bg}}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs" style={{background:'rgba(255,255,255,.6)',color:m.color}}>{m.name.slice(0,2)}</div>
+                  <span className="font-bold text-sm" style={{color:m.color}}>{m.name}</span>
+                  <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full text-white" style={{background:m.acc}}>{total} วัน</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {shifts.map(s=>{const cnt=c[s.id]||0;return cnt?<div key={s.id} className="flex items-center gap-1 rounded-lg px-2 py-1" style={{background:'rgba(255,255,255,.65)'}}><span className="text-xs">{s.em}</span><span className="text-xs font-bold" style={{color:s.tc}}>{s.lb}</span><span className="text-xs font-black" style={{color:m.color}}>{cnt}</span></div>:null;})}
+                </div>
+                <div className="h-2 rounded-full overflow-hidden flex" style={{background:'rgba(255,255,255,.4)'}}>
+                  {shifts.map(s=>{const cnt=c[s.id]||0,pct=total?(cnt/total*100):0;return pct>0?<div key={s.id} style={{width:`${pct}%`,background:s.c}}/>:null;})}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── SHIFT MODAL ───────────────────────────────────────────────────────────────
+const ShiftModal=({date,sched,setSched,onClose})=>{
+  const [draft,setDraft]=useState(sched[date]||{});
+  const holiday=HOLS[date];
+  const pick=(mid,sid)=>setDraft(p=>({...p,[mid]:p[mid]===sid?undefined:sid}));
+  const save=()=>{
+    const c=Object.fromEntries(Object.entries(draft).filter(([,v])=>v));
+    setSched(p=>({...p,[date]:c}));onClose();
+  };
+  return(
+    <Modal title={`📅 ${fmtD(date)}`} onClose={onClose}>
+      {holiday&&<div className="mb-4 p-3 rounded-xl text-sm font-bold text-red-600" style={{background:'#FEE2E2'}}>🎉 {holiday}</div>}
+      <div className="space-y-5">
+        {M.map(m=>{
+          const shifts=m.isNurse?NS:HS,sel=draft[m.id];
+          return(
+            <div key={m.id}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm" style={{background:m.bg,color:m.color}}>{m.name.slice(0,2)}</div>
+                <span className="font-bold text-sm" style={{color:m.color}}>
+                  {m.name}
+                  {m.isNurse&&<span className="ml-1 font-normal text-xs opacity-60">🩻 นักรังสีเทคนิค</span>}
+                  {m.isAdmin&&<span className="ml-1 font-normal text-xs opacity-60">👑 Admin</span>}
+                </span>
+                {sel&&<span className="ml-auto text-xs text-green-500 font-bold">✓</span>}
+              </div>
+              <div className={`grid gap-2 ${m.isNurse?'grid-cols-3':'grid-cols-3'}`}>
+                {shifts.map(s=>(
+                  <button key={s.id} onClick={()=>pick(m.id,s.id)} className="py-2.5 px-1 rounded-xl text-center"
+                          style={{background:sel===s.id?s.bg:'#F9F5F0',color:sel===s.id?s.tc:'#9CA3AF',border:`2px solid ${sel===s.id?s.c:'transparent'}`,fontWeight:sel===s.id?700:400}}>
+                    <div className="text-lg leading-none">{s.em}</div>
+                    <div style={{fontSize:'10px'}} className="mt-1 leading-tight">{s.lb}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={save} className="w-full mt-6 py-4 rounded-xl text-white font-bold text-base" style={{background:'#B45309'}}>บันทึก ✓</button>
+    </Modal>
+  );
+};
+
+// ── CALENDAR PAGE ─────────────────────────────────────────────────────────────
+const Calendar=({sched,setSched})=>{
+  const now=new Date();
+  const [mo,setMo]=useState(now.getMonth());
+  const [yr,setYr]=useState(now.getFullYear()<=2026?now.getFullYear():2026);
+  const [sel,setSel]=useState(null);
+  const [showSum,setShowSum]=useState(true);
+  const first=new Date(yr,mo,1).getDay(),dim=new Date(yr,mo+1,0).getDate();
+  const cells=[...Array(first).fill(null),...Array.from({length:dim},(_,i)=>i+1)];
+  const ds=d=>`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const prev=()=>{if(mo===0){setMo(11);setYr(y=>y-1);}else setMo(m=>m-1);};
+  const next=()=>{if(mo===11){setMo(0);setYr(y=>y+1);}else setMo(m=>m+1);};
+  const monthHols=Object.entries(HOLS).filter(([k])=>{const[hy,hm]=k.split('-').map(Number);return hy===yr&&hm===mo+1;});
+  const cellShifts=d=>{
+    const data=sched[ds(d)];if(!data)return[];
+    return Object.entries(data).map(([mid,sid])=>{const m=gM(mid);return m?{m,sid}:null;}).filter(Boolean);
+  };
+  return(
+    <div className="px-4 pt-4 pb-28 max-w-lg mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prev} className="p-2.5 rounded-full hover:bg-amber-100 text-amber-700"><IL sz={22}/></button>
+        <div className="text-center">
+          <h2 className="text-xl font-black text-amber-900">{MTHF[mo]} {yr+543}</h2>
+          <p className="text-xs text-amber-400">{yr}</p>
+        </div>
+        <button onClick={next} className="p-2.5 rounded-full hover:bg-amber-100 text-amber-700"><IR sz={22}/></button>
+      </div>
+      {/* Legend */}
+      <div className="wood rounded-2xl p-3 mb-4">
+        <p className="text-xs font-bold text-amber-600 mb-2">🩻 PING PING</p>
+        <div className="flex flex-wrap gap-1.5 mb-3">{NS.map(s=><span key={s.id} className="text-xs px-2 py-1 rounded-full font-semibold" style={{background:s.bg,color:s.tc}}>{s.em}{s.lb}</span>)}</div>
+        <p className="text-xs font-bold text-amber-600 mb-2">👥 สมาชิก</p>
+        <div className="flex flex-wrap gap-1.5">
+          {HS.map(s=><span key={s.id} className="text-xs px-2 py-1 rounded-full font-semibold" style={{background:s.bg,color:s.tc}}>{s.em}{s.lb}</span>)}
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">{M.map(m=><span key={m.id} className="text-xs px-2 py-1 rounded-full font-semibold" style={{background:m.bg,color:m.color}}>● {m.name}</span>)}</div>
+      </div>
+      {/* Grid */}
+      <div className="wood rounded-2xl overflow-hidden mb-4">
+        <div className="grid grid-cols-7 border-b border-amber-100">
+          {DAYS.map((d,i)=><div key={d} className="py-2.5 text-center text-xs font-bold" style={{color:i===0?'#DC2626':i===6?'#2563EB':'#92400E'}}>{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((d,idx)=>{
+            if(!d)return<div key={idx} className="min-h-[62px] border-b border-r border-amber-50 bg-amber-50/30"/>;
+            const dstr=ds(d),dow=new Date(yr,mo,d).getDay();
+            const isHol=!!HOLS[dstr],isTod=dstr===tdStr(),shifts=cellShifts(d);
+            return(
+              <button key={idx} onClick={()=>setSel(dstr)}
+                      className="min-h-[62px] p-1 flex flex-col items-center border-b border-r border-amber-50 hover:bg-amber-100/50 transition-colors"
+                      style={{background:isTod?'#FEF3C7':isHol?'#FFF5F5':'#FEFCF8'}}>
+                <span className="w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold"
+                      style={{background:isTod?'#B45309':'transparent',color:isTod?'#fff':isHol||dow===0?'#DC2626':dow===6?'#2563EB':'#78350F'}}>
+                  {d}
+                </span>
+                {isHol&&<div className="w-1.5 h-1.5 rounded-full mt-0.5" style={{background:'#FCA5A5'}}/>}
+                <div className="flex flex-wrap gap-px justify-center mt-0.5">
+                  {shifts.map(({m,sid},i)=>{const s=gS(m.id,sid);return<div key={i} className="w-2.5 h-2.5 rounded-full" style={{background:s?.c||m.acc}}/>;} )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {monthHols.length>0&&(
+        <div className="wood rounded-xl p-4 mb-0">
+          <p className="text-xs font-bold text-amber-700 mb-3">📅 วันหยุดเดือน{MTHF[mo]}</p>
+          <div className="space-y-2">
+            {monthHols.map(([k,v])=><div key={k} className="flex gap-3"><span className="font-bold text-red-400 text-sm min-w-[28px]">{k.split('-')[2]}</span><span className="text-sm text-amber-800">{v}</span></div>)}
+          </div>
+        </div>
+      )}
+      <button onClick={()=>setShowSum(v=>!v)} className="w-full mt-4 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold border-2 border-dashed"
+              style={{borderColor:'#D4C5A9',color:'#B45309',background:'#FEFCF8'}}>
+        📊 {showSum?'ซ่อน':'ดู'}สรุปเดือน{MTHF[mo]}
+      </button>
+      {showSum&&<MonthSummary sched={sched} yr={yr} mo={mo}/>}
+      {sel&&<ShiftModal date={sel} sched={sched} setSched={setSched} onClose={()=>setSel(null)}/>}
+    </div>
+  );
+};
+
+// ── NOTES PAGE ────────────────────────────────────────────────────────────────
+const Notes=({notes,setNotes,user})=>{
+  const [txt,setTxt]=useState('');
+  const add=()=>{if(!txt.trim())return;setNotes(p=>[...p,{id:Date.now(),text:txt.trim(),by:user,date:tdStr()}]);setTxt('');};
+  return(
+    <div className="px-4 pt-4 pb-28 max-w-lg mx-auto">
+      <h1 className="text-2xl font-black text-amber-900 mb-1">📝 โน้ตบ้าน</h1>
+      <p className="text-sm text-amber-500 mb-5">ฝากข้อความถึงคนในบ้าน</p>
+      <div className="wood rounded-2xl p-4 mb-5">
+        <textarea value={txt} onChange={e=>setTxt(e.target.value)} rows={3}
+                  placeholder={"กะดึก: อย่าส่งเสียงดังตอนเช้า\nมีข้าวในหม้อ\nมีพัสดุมาส่ง อยู่หน้าบ้าน"}
+                  className="w-full rounded-xl px-3 py-3 text-sm border border-amber-200 outline-none resize-none mb-3" style={{background:'#FAF7F2',color:'#92400E'}}/>
+        <button onClick={add} disabled={!txt.trim()} className="w-full py-3.5 rounded-xl text-white font-bold" style={{background:txt.trim()?'#B45309':'#D4C5A9'}}>📌 โพสต์โน้ต</button>
+      </div>
+      <div className="space-y-3">
+        {[...notes].reverse().map(n=>{const m=gM(n.by);return(
+          <div key={n.id} className="wood rounded-2xl p-4">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm" style={{background:m?.bg,color:m?.color}}>{m?.name.slice(0,2)}</div>
+              <div><p className="font-bold text-sm" style={{color:m?.color}}>{m?.name}</p><p className="text-xs text-amber-400">{fmtD(n.date)}</p></div>
+              <button onClick={()=>setNotes(p=>p.filter(x=>x.id!==n.id))} className="ml-auto text-amber-300 hover:text-red-400 p-1"><ID sz={15}/></button>
+            </div>
+            <p className="text-sm text-amber-900 leading-relaxed whitespace-pre-wrap">{n.text}</p>
+          </div>
+        );})}
+        {notes.length===0&&<div className="text-center py-16"><CatIcon sz={60}/><p className="text-amber-300 text-sm mt-4">ยังไม่มีโน้ต</p></div>}
+      </div>
+    </div>
+  );
+};
+
+// ── ADMIN PAGE ────────────────────────────────────────────────────────────────
+const Admin=({shop,setShop,sched,setSched,wakeups,setWakeups,notes,setNotes})=>{
+  const [cfm,setCfm]=useState({});
+  const stats=[{e:'🛒',lb:'รายการค้าง',v:shop.filter(i=>!i.done).length},{e:'📅',lb:'วันที่ลงเวร',v:Object.keys(sched).length},{e:'⏰',lb:'ฝากปลุกวันนี้',v:wakeups.filter(c=>c.date===tdStr()).length},{e:'📝',lb:'โน้ต',v:notes.length}];
+  const acts=[
+    {k:'sh',lb:'Reset Shopping List',desc:'ลบรายการซื้อของทั้งหมด',fn:()=>setShop([])},
+    {k:'sc',lb:'Reset ตารางเวร',desc:'ลบตารางเวรทั้งหมด ⚠️',fn:()=>setSched({})},
+    {k:'wu',lb:'Clear Wake-up Calls',desc:'ลบการฝากปลุกทั้งหมด',fn:()=>setWakeups([])},
+    {k:'nt',lb:'Clear โน้ตทั้งหมด',desc:'ลบโน้ตบ้านทั้งหมด',fn:()=>setNotes([])},
+  ];
+  return(
+    <div className="px-4 pt-4 pb-28 max-w-lg mx-auto">
+      <h1 className="text-2xl font-black text-amber-900 mb-1">⚙️ Admin Panel</h1>
+      <p className="text-sm text-amber-500 mb-5">สำหรับ CHA เท่านั้น 👑</p>
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        {stats.map(s=><div key={s.lb} className="wood rounded-xl p-3.5 text-center"><div className="text-2xl mb-1">{s.e}</div><div className="text-2xl font-black text-amber-800">{s.v}</div><div className="text-xs text-amber-500 mt-0.5">{s.lb}</div></div>)}
+      </div>
+      <div className="wood rounded-2xl p-4 mb-4">
+        <h3 className="font-bold text-amber-900 mb-3">👥 สมาชิกในบ้าน</h3>
+        <div className="space-y-2">
+          {M.map(m=>(
+            <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl" style={{background:m.bg}}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{background:'rgba(255,255,255,.7)',color:m.color}}>{m.name.slice(0,2)}</div>
+              <div className="flex-1"><p className="font-bold text-sm" style={{color:m.color}}>{m.name}</p><p className="text-xs opacity-60" style={{color:m.color}}>{m.isAdmin?'👑 Admin':m.isNurse?'🩻 นักรังสีเทคนิค':'👤 สมาชิก'}</p></div>
+              <div className="w-3 h-3 rounded-full" style={{background:m.acc}}/>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="wood rounded-2xl p-4">
+        <h3 className="font-bold text-amber-900 mb-3">🗑️ จัดการข้อมูล</h3>
+        <div className="space-y-3">
+          {acts.map(a=>(
+            <div key={a.k} className="p-4 rounded-xl" style={{background:'#FFF5F5',border:'1px solid #FECACA'}}>
+              <p className="text-sm font-bold text-red-700">{a.lb}</p>
+              <p className="text-xs text-red-400 mb-3 mt-0.5">{a.desc}</p>
+              {cfm[a.k]?(
+                <div className="flex gap-2">
+                  <button onClick={()=>{a.fn();setCfm({});}} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold">ยืนยัน</button>
+                  <button onClick={()=>setCfm({})} className="flex-1 py-2.5 rounded-xl border border-red-200 text-red-400 text-sm font-semibold">ยกเลิก</button>
+                </div>
+              ):(
+                <button onClick={()=>setCfm({[a.k]:true})} className="w-full py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold">{a.lb}</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-center mt-8 mb-2"><CatIcon sz={48}/></div>
+      <p className="text-center text-xs text-amber-300 pb-2">🐱 Home Board · Made with ❤️ for the family</p>
+    </div>
+  );
+};
+
+// ── APP ROOT ──────────────────────────────────────────────────────────────────
+const App=()=>{
+  const [page,setPage]=useState('dashboard');
+  const [user,setUser]=useState(()=>ls.get('hb_user','CHA'));
+  const [sched,setSchedRaw]=useState(()=>ls.get('hb_sched',{}));
+  const [shop,setShopRaw]=useState(()=>ls.get('hb_shop',[]));
+  const [wakeups,setWakeupsRaw]=useState(()=>ls.get('hb_wake',[]));
+  const [notes,setNotesRaw]=useState(()=>ls.get('hb_notes',[]));
+  const [toasts,setToasts]=useState([]);
+
+  useEffect(()=>ls.set('hb_user',user),[user]);
+  useEffect(()=>ls.set('hb_sched',sched),[sched]);
+  useEffect(()=>ls.set('hb_shop',shop),[shop]);
+  useEffect(()=>ls.set('hb_wake',wakeups),[wakeups]);
+  useEffect(()=>ls.set('hb_notes',notes),[notes]);
+
+  const pushToast=useCallback((t)=>{
+    setToasts(p=>[...p,t]);
+    setTimeout(()=>setToasts(p=>p.filter(x=>x.id!==t.id)),6000);
+  },[]);
+  const dismissToast=useCallback(id=>setToasts(p=>p.filter(x=>x.id!==id)),[]);
+
+  const {requestPerm,scheduleWake}=useNotifications(wakeups,shop,pushToast);
+  const setSched=useCallback(u=>setSchedRaw(p=>typeof u==='function'?u(p):u),[]);
+  const isAdmin=user==='CHA';
+
+  return(
+    <div style={{fontFamily:"'Sarabun',sans-serif",background:'#FAF7F2',minHeight:'100vh'}}>
+      <ToastLayer toasts={toasts} dismiss={dismissToast}/>
+      <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2 border-b border-amber-200" style={{background:'#FEFCF8'}}>
+        <div className="flex items-center gap-2"><CatIcon sz={24}/><span className="text-sm font-black text-amber-800">Home Board</span></div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-amber-400 mr-1">ฉัน:</span>
+          {M.map(m=>(
+            <button key={m.id} onClick={()=>setUser(m.id)} className="text-xs px-2 py-1 rounded-full font-bold"
+                    style={{background:user===m.id?m.acc:'#F3F4F6',color:user===m.id?'#fff':'#9CA3AF'}}>
+              {m.name.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {page==='dashboard'&&<Dashboard sched={sched} user={user} setUser={setUser} wakeups={wakeups} setWakeups={setWakeupsRaw} shop={shop} setShop={setShopRaw} notes={notes} setNotes={setNotesRaw} isAdmin={isAdmin} requestPerm={requestPerm} scheduleWake={scheduleWake}/>}
+      {page==='calendar'&&<Calendar sched={sched} setSched={setSched}/>}
+      {page==='notes'&&<Notes notes={notes} setNotes={setNotesRaw} user={user}/>}
+      {page==='admin'&&isAdmin&&<Admin shop={shop} setShop={setShopRaw} sched={sched} setSched={setSched} wakeups={wakeups} setWakeups={setWakeupsRaw} notes={notes} setNotes={setNotesRaw}/>}
+      <Nav page={page} go={setPage} admin={isAdmin}/>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
