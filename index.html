@@ -55,6 +55,7 @@ const gS=(mid,sid)=>{const m=gM(mid);return m?.isNurse?NS.find(s=>s.id===sid):HS
 
 // ── SHIFT/STATUS CONSTANTS ────────────────────────────────────────────────────
 const NS=[
+  {id:'home',     lb:'อยู่บ้าน',t:'',     em:'🏠',c:'#059669',bg:'#D1FAE5',tc:'#065F46'},
   {id:'morning',  lb:'เช้า',    t:'06-14',em:'🌅',c:'#D97706',bg:'#FEF3C7',tc:'#92400E'},
   {id:'afternoon',lb:'บ่าย',    t:'14-22',em:'☀️',c:'#EA580C',bg:'#FFEDD5',tc:'#9A3412'},
   {id:'night',    lb:'ดึก',     t:'22-06',em:'🌙',c:'#4338CA',bg:'#E0E7FF',tc:'#3730A3'},
@@ -243,7 +244,7 @@ const NotifBanner=({requestPerm})=>{
 // ── WHO'S HOME ────────────────────────────────────────────────────────────────
 const WhosHome=({sched,user,setUser})=>{
   const td=tdStr(),day=sched[td]||{};
-  const isHome=mid=>{const s=day[mid];if(!s)return true;const m=gM(mid);return m?.isNurse?(s==='off'||s==='home'):s==='home';};
+  const isHome=mid=>{const s=day[mid];if(!s)return true;const m=gM(mid);return m?.isNurse?(s==='off'||s==='home'):(s==='home');};
   return(<div className="wood rounded-2xl p-4 mb-4">
     <div className="flex items-center mb-4 gap-2"><CatIcon sz={26}/><h2 className="font-bold text-amber-900 text-base">Who's Home Now?</h2><span className="ml-auto text-xs text-amber-400">{fmtD(td)}</span></div>
     <div className="grid grid-cols-2 gap-3">
