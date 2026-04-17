@@ -27,7 +27,7 @@ input,textarea,select{font-family:'Sarabun',sans-serif;}
 const {useState,useEffect,useCallback,useRef}=React;
 
 // ── SHEET URL ─────────────────────────────────────────────────────────────────
-const SHEET_URL='https://script.google.com/macros/s/AKfycbw25x7KTGr92o5_nc_HshiQqbVUZsKQ5viIG-dziGQng1GQvEUyB7KYL86hEDlMlns/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbwBwGuLJg5cMCcut_tn6N0usZs158U49UMw3X_r1cZGr8IOLCzKkeGaCFtf0j7Kw54/exec';
 
 // ── DEFAULT MEMBERS ───────────────────────────────────────────────────────────
 const M_DEFAULT=[
@@ -595,25 +595,57 @@ const Notes=({notes,setNotes,user})=>{
 
 // ── APPS SCRIPT GUIDE ────────────────────────────────────────────────────────
 const SCRIPT_CODE=`const SHEET_NAME = 'HomeBoard';
+const EMAIL_TO   = 'chanana.1827@gmail.com';
 
 function doGet(e) {
   const sheet = SpreadsheetApp
     .getActiveSpreadsheet()
     .getSheetByName(SHEET_NAME);
-  const data = sheet.getRange('A1').getValue();
-  return ContentService
-    .createTextOutput(data || '{}')
+  const raw = sheet.getRange('A1').getValue();
+  const out = ContentService
+    .createTextOutput(raw || '{}')
     .setMimeType(ContentService.MimeType.JSON);
+  return out;
 }
 
 function doPost(e) {
   const sheet = SpreadsheetApp
     .getActiveSpreadsheet()
     .getSheetByName(SHEET_NAME);
-  sheet.getRange('A1')
-    .setValue(e.postData.contents);
+
+  // โหลด data เดิม
+  let prev = {};
+  try { prev = JSON.parse(sheet.getRange('A1').getValue() || '{}'); }
+  catch(err) {}
+
+  // บันทึก data ใหม่
+  const body = e.postData.contents;
+  sheet.getRange('A1').setValue(body);
+
+  // ตรวจหา wakeup call ใหม่ → ส่ง email
+  try {
+    const next = JSON.parse(body);
+    const prevIds = new Set((prev.wakeups || []).map(w => String(w.id)));
+    const newCalls = (next.wakeups || []).filter(w => !prevIds.has(String(w.id)));
+    newCalls.forEach(call => {
+      const lines = [
+        '🔔 มีการฝากปลุกใหม่!',
+        '',
+        '⏰ เวลา   : ' + call.time,
+        '👤 ปลุก   : ' + call.target,
+        '✍️  ฝากโดย : ' + call.by,
+        '📝 โน้ต   : ' + (call.msg || '-'),
+      ];
+      MailApp.sendEmail({
+        to: EMAIL_TO,
+        subject: '⏰ Wake-up Call ' + call.time + ' → ' + call.target,
+        body: lines.join('\\n'),
+      });
+    });
+  } catch(err) {}
+
   return ContentService
-    .createTextOutput(JSON.stringify({ok:true}))
+    .createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
 
@@ -836,9 +868,17 @@ const App=()=>{
   const doSync=useCallback(()=>{
     const ts=Date.now();
     setSyncStatus('syncing');
-    // no-cors = fire & forget, ข้ามปัญหา CORS ได้เลย ข้อมูลยังถึง Sheets
-    fetch(SHEET_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({...syncPayload.current,_ts:ts}),headers:{'Content-Type':'text/plain'}})
-      .then(()=>{ls.set('hb_ts',ts);setSyncStatus('idle');})
+    // text/plain = simple request ไม่มี preflight, Apps Script รับได้ปกติ
+    fetch(SHEET_URL,{
+      method:'POST',
+      body:JSON.stringify({...syncPayload.current,_ts:ts}),
+      headers:{'Content-Type':'text/plain'}
+    })
+      .then(r=>r.json())
+      .then(d=>{
+        if(d.ok){ls.set('hb_ts',ts);setSyncStatus('idle');}
+        else setSyncStatus('error');
+      })
       .catch(()=>setSyncStatus('error'));
   },[]);
   useEffect(()=>{const t=setTimeout(doSync,3000);return()=>clearTimeout(t);},[sched,shop,wakeups,notes,members,doSync]);
