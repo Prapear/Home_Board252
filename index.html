@@ -27,7 +27,7 @@ input,textarea,select{font-family:'Sarabun',sans-serif;}
 const {useState,useEffect,useCallback,useRef}=React;
 
 // ── SHEET URL ─────────────────────────────────────────────────────────────────
-const SHEET_URL='https://script.google.com/macros/s/AKfycbwBwGuLJg5cMCcut_tn6N0usZs158U49UMw3X_r1cZGr8IOLCzKkeGaCFtf0j7Kw54/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyET2Yx2On3W2PhuRpnx7hiIcD9v2RfoQKidmajKRymviGg2mIWIKRbAk2-p7p6EbE/exec';
 
 // ── DEFAULT MEMBERS ───────────────────────────────────────────────────────────
 const M_DEFAULT=[
@@ -220,9 +220,15 @@ const Nav=({page,go,admin})=>{
 
 // ── SYNC STATUS DOT ───────────────────────────────────────────────────────────
 const SyncDot=({status,onSync})=>{
-  const cfg={idle:{c:'#10B981',lb:'ซิงค์แล้ว'},syncing:{c:'#F59E0B',lb:'กำลังซิงค์…'},error:{c:'#EF4444',lb:'timeout กด retry'},local:{c:'#9CA3AF',lb:'Local mode'}};
+  const cfg={
+    idle:   {c:'#10B981',lb:'ซิงค์แล้ว'},
+    syncing:{c:'#F59E0B',lb:'กำลังเชื่อมต่อ…'},
+    error:  {c:'#EF4444',lb:'กด retry'},
+    local:  {c:'#9CA3AF',lb:'Local mode'},
+  };
   const s=cfg[status]||cfg.idle;
-  return(<button onClick={onSync} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{background:'#FAF7F2',border:'1px solid #E8DCC8'}}>
+  const handleSync=()=>fetchRemote(1);
+  return(<button onClick={handleSync} className="flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{background:'#FAF7F2',border:'1px solid #E8DCC8'}}>
     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{background:s.c,boxShadow:status==='syncing'?`0 0 6px ${s.c}`:''}}/>
     <span style={{color:s.c,fontSize:'10px'}}>{s.lb}</span>
     <ISync sz={11} cl="text-amber-400"/>
@@ -834,15 +840,16 @@ const App=()=>{
   useEffect(()=>ls.set('hb_notes',notes),[notes]);
 
   // ── Sync: fetch on mount ──
-  useEffect(()=>{
+  const fetchRemote=useCallback((attempt=1)=>{
     setSyncStatus('syncing');
     const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),8000); // timeout 8s
+    // Apps Script cold start อาจใช้เวลา 10-15 วินาที ตั้ง timeout 20s
+    const timer=setTimeout(()=>ctrl.abort(),20000);
     fetch(SHEET_URL+'?t='+Date.now(),{signal:ctrl.signal})
       .then(r=>r.json())
       .then(d=>{
         clearTimeout(timer);
-        const remoteTs=d._ts||0, localTs=ls.get('hb_ts',0);
+        const remoteTs=d._ts||0,localTs=ls.get('hb_ts',0);
         if(remoteTs>localTs&&(d.sched!==undefined||d.shop!==undefined)){
           if(d.sched!==undefined)  setSchedRaw(d.sched);
           if(d.shop!==undefined)   setShopRaw(d.shop);
@@ -855,12 +862,17 @@ const App=()=>{
       })
       .catch(err=>{
         clearTimeout(timer);
-        // CORS หรือ network error → ใช้ localStorage ต่อไปได้ ไม่แสดง error ให้รกตา
-        if(err.name==='AbortError'){setSyncStatus('error');}
-        else{setSyncStatus('local');} // local-only mode
+        if(attempt<3){
+          // retry อัตโนมัติ 2 ครั้ง (รอ 5s ก่อน retry) ก่อนแสดง error
+          setSyncStatus('syncing');
+          setTimeout(()=>fetchRemote(attempt+1),5000);
+        } else {
+          setSyncStatus(err.name==='AbortError'?'error':'local');
+        }
       });
-    return()=>{ctrl.abort();clearTimeout(timer);};
   },[]);
+
+  useEffect(()=>{fetchRemote();},[fetchRemote]);
 
   // ── Sync: push debounced ──
   const syncPayload=useRef({});
@@ -931,7 +943,7 @@ const App=()=>{
     <div className="sticky top-0 z-30 flex items-center justify-between px-3 py-2 border-b border-amber-200" style={{background:'#FEFCF8'}}>
       <div className="flex items-center gap-2"><CatIcon sz={24}/><span className="text-sm font-black text-amber-800">Home Board</span></div>
       <div className="flex items-center gap-1 flex-wrap justify-end">
-        <SyncDot status={syncStatus} onSync={doSync}/>
+        <SyncDot status={syncStatus} fetchRemote={fetchRemote}/>
         <span className="text-xs text-amber-400 ml-1">ฉัน:</span>
         {members.map(m=>(
           <button key={m.id} onClick={()=>handleSwitchUser(m.id)} className="text-xs px-2 py-1 rounded-full font-bold"
