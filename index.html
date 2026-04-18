@@ -26,8 +26,15 @@ input,textarea,select{font-family:'Sarabun',sans-serif;}
 <script type="text/babel">
 const {useState,useEffect,useCallback,useRef}=React;
 
-// ── SHEET URL ─────────────────────────────────────────────────────────────────
-const SHEET_URL='https://script.google.com/macros/s/AKfycbxS3JODzYjjeDj9MoZPuX3zpWr1zdJNVjpdgU2TpLjPM0tZzR8iZYod_LXi-g0hkJk/exec';
+// ── BACKEND CONFIG ────────────────────────────────────────────────────────────
+// JSONBin.io — ใส่ค่าจาก jsonbin.io ของคุณ
+const JSONBIN_ID  = '69e3413f856a682189487189';
+const JSONBIN_KEY = '$2a$10$aWQXIapKcwdPRTiBGJT2Tu0VYR8.S3.4tmOsyGaJ6E7tWupYcvX9y';
+const JSONBIN_GET = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`;
+const JSONBIN_PUT = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
+
+// Apps Script — ใช้เพื่อส่ง email เท่านั้น (POST no-cors, ไม่ต้องรอ response)
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw25x7KTGr92o5_nc_HshiQqbVUZsKQ5viIG-dziGQng1GQvEUyB7KYL86hEDlMlns/exec';
 
 // ── DEFAULT MEMBERS ───────────────────────────────────────────────────────────
 const M_DEFAULT=[
@@ -221,10 +228,11 @@ const Nav=({page,go,admin})=>{
 // ── SYNC STATUS DOT ───────────────────────────────────────────────────────────
 const SyncDot=({status,onSync})=>{
   const cfg={
-    idle:   {c:'#10B981',lb:'ซิงค์แล้ว'},
-    syncing:{c:'#F59E0B',lb:'กำลังเชื่อมต่อ…'},
-    error:  {c:'#EF4444',lb:'กด retry'},
-    local:  {c:'#9CA3AF',lb:'Local mode'},
+    idle:   {c:'#10B981',lb:'ซิงค์แล้ว ✓'},
+    syncing:{c:'#F59E0B',lb:'กำลังซิงค์…'},
+    error:  {c:'#EF4444',lb:'ซิงค์ไม่ได้ retry'},
+    setup:  {c:'#6366F1',lb:'ตั้งค่า JSONBin'},
+    local:  {c:'#9CA3AF',lb:'Local only'},
   };
   const s=cfg[status]||cfg.idle;
   const handleSync=()=>fetchRemote(1);
@@ -607,11 +615,18 @@ function doGet(e) {
   const sheet = SpreadsheetApp
     .getActiveSpreadsheet()
     .getSheetByName(SHEET_NAME);
-  const raw = sheet.getRange('A1').getValue();
-  const out = ContentService
-    .createTextOutput(raw || '{}')
+  const raw = sheet.getRange('A1').getValue() || '{}';
+
+  // รองรับ JSONP (callback=xxx) เพื่อข้าม CORS
+  const cb = e.parameter.callback;
+  if (cb) {
+    return ContentService
+      .createTextOutput(cb + '(' + raw + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(raw)
     .setMimeType(ContentService.MimeType.JSON);
-  return out;
 }
 
 function doPost(e) {
@@ -619,33 +634,29 @@ function doPost(e) {
     .getActiveSpreadsheet()
     .getSheetByName(SHEET_NAME);
 
-  // โหลด data เดิม
   let prev = {};
   try { prev = JSON.parse(sheet.getRange('A1').getValue() || '{}'); }
   catch(err) {}
 
-  // บันทึก data ใหม่
   const body = e.postData.contents;
   sheet.getRange('A1').setValue(body);
 
-  // ตรวจหา wakeup call ใหม่ → ส่ง email
+  // ส่ง email เมื่อมี wakeup call ใหม่
   try {
     const next = JSON.parse(body);
     const prevIds = new Set((prev.wakeups || []).map(w => String(w.id)));
     const newCalls = (next.wakeups || []).filter(w => !prevIds.has(String(w.id)));
     newCalls.forEach(call => {
-      const lines = [
-        '🔔 มีการฝากปลุกใหม่!',
-        '',
-        '⏰ เวลา   : ' + call.time,
-        '👤 ปลุก   : ' + call.target,
-        '✍️  ฝากโดย : ' + call.by,
-        '📝 โน้ต   : ' + (call.msg || '-'),
-      ];
       MailApp.sendEmail({
         to: EMAIL_TO,
         subject: '⏰ Wake-up Call ' + call.time + ' → ' + call.target,
-        body: lines.join('\\n'),
+        body: [
+          '🔔 มีการฝากปลุกใหม่!','',
+          '⏰ เวลา   : ' + call.time,
+          '👤 ปลุก   : ' + call.target,
+          '✍️  ฝากโดย : ' + call.by,
+          '📝 โน้ต   : ' + (call.msg || '-'),
+        ].join('\\n'),
       });
     });
   } catch(err) {}
@@ -840,35 +851,29 @@ const App=()=>{
   useEffect(()=>ls.set('hb_notes',notes),[notes]);
 
   // ── Sync: fetch on mount ──
+  // ── Sync: fetch from JSONBin ──
   const fetchRemote=useCallback((attempt=1)=>{
+    if(JSONBIN_ID==='YOUR_BIN_ID'){setSyncStatus('setup');return;}
     setSyncStatus('syncing');
-    const ctrl=new AbortController();
-    // Apps Script cold start อาจใช้เวลา 10-15 วินาที ตั้ง timeout 20s
-    const timer=setTimeout(()=>ctrl.abort(),20000);
-    fetch(SHEET_URL+'?t='+Date.now(),{signal:ctrl.signal})
-      .then(r=>r.json())
+    fetch(JSONBIN_GET,{headers:{'X-Master-Key':JSONBIN_KEY,'X-Bin-Meta':false}})
+      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
       .then(d=>{
-        clearTimeout(timer);
-        const remoteTs=d._ts||0,localTs=ls.get('hb_ts',0);
-        if(remoteTs>localTs&&(d.sched!==undefined||d.shop!==undefined)){
-          if(d.sched!==undefined)  setSchedRaw(d.sched);
-          if(d.shop!==undefined)   setShopRaw(d.shop);
-          if(d.wakeups!==undefined)setWakeupsRaw(d.wakeups);
-          if(d.notes!==undefined)  setNotesRaw(d.notes);
-          if(d.members!==undefined)setMembersRaw(d.members);
+        // JSONBin wraps data in {record:{...}} — ดึง record ออก
+        const data=d.record||d;
+        const remoteTs=data._ts||0,localTs=ls.get('hb_ts',0);
+        if(remoteTs>localTs){
+          if(data.sched!==undefined)  setSchedRaw(data.sched);
+          if(data.shop!==undefined)   setShopRaw(data.shop);
+          if(data.wakeups!==undefined)setWakeupsRaw(data.wakeups);
+          if(data.notes!==undefined)  setNotesRaw(data.notes);
+          if(data.members!==undefined)setMembersRaw(data.members);
           ls.set('hb_ts',remoteTs);
         }
         setSyncStatus('idle');
       })
-      .catch(err=>{
-        clearTimeout(timer);
-        if(attempt<3){
-          // retry อัตโนมัติ 2 ครั้ง (รอ 5s ก่อน retry) ก่อนแสดง error
-          setSyncStatus('syncing');
-          setTimeout(()=>fetchRemote(attempt+1),5000);
-        } else {
-          setSyncStatus(err.name==='AbortError'?'error':'local');
-        }
+      .catch(()=>{
+        if(attempt<3){setTimeout(()=>fetchRemote(attempt+1),4000);}
+        else setSyncStatus('error');
       });
   },[]);
 
@@ -877,21 +882,22 @@ const App=()=>{
   // ── Sync: push debounced ──
   const syncPayload=useRef({});
   syncPayload.current={sched,shop,wakeups,notes,members};
+  // ── Sync: push to JSONBin ──
   const doSync=useCallback(()=>{
+    if(JSONBIN_ID==='YOUR_BIN_ID')return;
     const ts=Date.now();
     setSyncStatus('syncing');
-    // text/plain = simple request ไม่มี preflight, Apps Script รับได้ปกติ
-    fetch(SHEET_URL,{
-      method:'POST',
-      body:JSON.stringify({...syncPayload.current,_ts:ts}),
-      headers:{'Content-Type':'text/plain'}
+    fetch(JSONBIN_PUT,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':JSONBIN_KEY},
+      body:JSON.stringify({...syncPayload.current,_ts:ts})
     })
-      .then(r=>r.json())
-      .then(d=>{
-        if(d.ok){ls.set('hb_ts',ts);setSyncStatus('idle');}
-        else setSyncStatus('error');
-      })
+      .then(r=>{if(!r.ok)throw new Error(r.status);return r.json();})
+      .then(()=>{ls.set('hb_ts',ts);setSyncStatus('idle');})
       .catch(()=>setSyncStatus('error'));
+
+    // ส่ง email ผ่าน Apps Script (fire & forget ไม่รอ response)
+    fetch(SHEET_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(syncPayload.current),headers:{'Content-Type':'text/plain'}}).catch(()=>{});
   },[]);
   useEffect(()=>{const t=setTimeout(doSync,3000);return()=>clearTimeout(t);},[sched,shop,wakeups,notes,members,doSync]);
 
